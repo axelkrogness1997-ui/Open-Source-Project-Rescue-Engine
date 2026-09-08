@@ -92,6 +92,18 @@ npm install
 
 ### Environment Variable
 
+### GitHub API Rate Limits & Error Handling
+
+The Rescue Engine uses the GitHub REST API to retrieve repository information.
+
+A GitHub personal access token is used through the `GITHUB_TOKEN` environment variable to provide authenticated API requests and help provide a higher API request limit than unauthenticated requests.
+
+The application does not expose the token to the browser or commit it to the repository. The token is stored in `.env.local` during local development and configured as an environment variable in the production deployment.
+
+The API route also handles common GitHub API failures. If GitHub returns a rate-limit response, the application returns a clear rate-limit message asking the user to try again later. Other failed GitHub requests return a user-friendly error instead of exposing internal API details.
+
+Repository-level requests for README files, contributors, and recent commits are also handled safely so that missing or unavailable information does not prevent the rest of a repository's information from being displayed.
+
 Create a local `.env.local` file and add your GitHub token:
 
 ```text

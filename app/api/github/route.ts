@@ -10,9 +10,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const query = encodeURIComponent(
-    `${search} stars:>5`
-  );
+  const query = encodeURIComponent(`${search} stars:>5`);
 
   const response = await fetch(
     `https://api.github.com/search/repositories?q=${query}&sort=updated&order=asc&per_page=10`,
@@ -24,9 +22,22 @@ export async function GET(request: NextRequest) {
     }
   );
 
+  if (response.status === 403 || response.status === 429) {
+    return NextResponse.json(
+      {
+        error:
+          "GitHub API rate limit reached. Please wait a while and try again.",
+      },
+      { status: 429 }
+    );
+  }
+
   if (!response.ok) {
     return NextResponse.json(
-      { error: "GitHub search failed." },
+      {
+        error:
+          "GitHub search could not be completed. Please try again later.",
+      },
       { status: response.status }
     );
   }
@@ -35,39 +46,33 @@ export async function GET(request: NextRequest) {
 
   const repositories = await Promise.all(
     (searchData.items || []).slice(0, 10).map(async (repo: any) => {
+      const headers = {
+        Accept: "application/vnd.github+json",
+        Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
+      };
+
       const readmeResponse = await fetch(
         `https://api.github.com/repos/${repo.full_name}/readme`,
-        {
-          headers: {
-            Accept: "application/vnd.github+json",
-            Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
-          },
-        }
+        { headers }
       );
 
       const contributorsResponse = await fetch(
         `https://api.github.com/repos/${repo.full_name}/contributors?per_page=1`,
-        {
-          headers: {
-            Accept: "application/vnd.github+json",
-            Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
-          },
-        }
+        { headers }
       );
 
-      const contributorsData = await contributorsResponse.json();
+      const contributorsData = contributorsResponse.ok
+        ? await contributorsResponse.json()
+        : [];
 
       const commitsResponse = await fetch(
         `https://api.github.com/repos/${repo.full_name}/commits?per_page=1`,
-        {
-          headers: {
-            Accept: "application/vnd.github+json",
-            Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
-          },
-        }
+        { headers }
       );
 
-      const commitsData = await commitsResponse.json();
+      const commitsData = commitsResponse.ok
+        ? await commitsResponse.json()
+        : [];
 
       const contributorsLink =
         contributorsResponse.headers.get("link");
@@ -100,7 +105,7 @@ export async function GET(request: NextRequest) {
   );
 
   return NextResponse.json({
-  repositories,
-  totalCount: searchData.total_count || 0,
-});
+    repositories,
+    totalCount: searchData.total_count || 0,
+  });
 }
